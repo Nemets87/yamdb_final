@@ -86,13 +86,18 @@ COPY . .
 CMD ["gunicorn", "api_yamdb.wsgi:application", "--bind", "0:8000"]
 ```
 
-Cделать миграции, создать суперпользователя и собрать статику 
+перед созданием образа лучше удалить предыдущие варианты образа с ДокерХаб. На ДХ - Settings - Delete repository.
 
 ```
-sudo docker-compose exec web python manage.py makemigrations reviews
-sudo docker-compose exec web python manage.py migrate 
-sudo docker-compose exec web python manage.py createsuperuser 
-sudo docker-compose exec web python manage.py collectstatic --no-input 
+- создать образ (находиться в папке с докерфайлом)
+docker build -t <ваш_логин_докерхаб>/<название_образа_придумать> .
+
+- пушить образ
+docker login -u <ваш_логин_докерхаб>
+docker push <ваш_логин_докерхаб>/<название_образа_придумать>:v1 
+
+
+- снова правим докерфайл
 ```
 - проверить воркфлоу, потом скопировать в корень проекта
 ```
@@ -140,9 +145,9 @@ jobs:
         - name: Push to Docker Hub
           uses: docker/build-push-action@v2
           with:
-            context: ./api_yamdb/
+            context: ./api_yamdb/ # а без этой строчки = будут бессонные ночки !
             push: true
-            tags: nemets87/api_yamdb:v1
+            tags: nemets87/api_yamdb:v1 # можно через секрет = но секрета нет !
 
   deploy:
       runs-on: ubuntu-latest
@@ -197,7 +202,17 @@ sudo docker-compose exec web python manage.py migrate
 ## Получение списка всех категорий
 
 ```
-логинемся
+cd ~
+touch docker-compose.yml
+nano docker-compose.yml
+копировать содержимое файла на локальном компе и вставить в файл на сервере
+
+cd ~
+mkdir nginx
+cd nginx
+touch default.conf
+nano default.conf
+копировать содержимое файла на локальном компе и вставить в файл на сервере
 ```
 ## ВМ не крутим целый год == на диплом ее == на диплом 
 
