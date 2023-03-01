@@ -16,13 +16,7 @@ DEBUG = False
 
 DOMAIN_MAME = 'yamdb.com'
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "158.160.21.17",
-    "web:8000",
-    "web",
-]
+ALLOWED_HOSTS = ["*"]
 
 # Application definition
 
