@@ -4,9 +4,9 @@
 -
 Коты рулят !
 
-# Проект **YaMDb** 
+# Проект **yamdb_final** 
 
-#### **Django & Docker Power**
+#### **Django & Docker Power + CI и CD проекта api_yamdb = 16 Sprint**
 ![docker power](https://img.shields.io/docker/automated/nemets87/infra_sp2)
 ![django version](https://img.shields.io/badge/Django-2.2-green)
 
