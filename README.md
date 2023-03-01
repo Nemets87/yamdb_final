@@ -18,7 +18,7 @@ Api собирает отзывы пользователей на различн
 Клонируем репозиторий и переходим в него:
 
 ```
-git clone https://github.com/Nemets87/infra_sp2
+git@github.com:Nemets87/yamdb_final.git
 
 ```
 Перейти в папку infra
@@ -27,7 +27,7 @@ git clone https://github.com/Nemets87/infra_sp2
 cd infra
 ```
 
-Создать файл ".env"
+в папке infra создаем файл .env с следующим содержимом:
 
 ```
 DB_ENGINE=django.db.backends.postgresql = указываем, что работаем с postgresql
@@ -40,25 +40,50 @@ DB_PORT=5432 = порт для подключения к БД
 - проверяем requirements.txt (должен содержать необходимый минимум,важно наличие самих пакетов, а не версии)
 
 ```
-asgiref==3.2.10
-Django==2.2.16
-django-filter==2.4.0
-djangorestframework==3.12.4
-djangorestframework-simplejwt==4.8.0
 gunicorn==20.0.4
-psycopg2-binary==2.8.6
+django==2.2.16
+pytest-django==4.4.0
+requests==2.26.0
+djangorestframework==3.12.4
 PyJWT==2.1.0
+pytest==6.2.4
+pytest-pythonpath==0.7.3
+django-filter==2.4.0
+djangorestframework-simplejwt==4.8.0
+asgiref==3.2.10
+psycopg2-binary==2.8.6
 pytz==2020.1
 sqlparse==0.3.1
+python-dotenv==0.21
 ```
 Работать мы будем в linux и все команды начинаются со слова sudo
 P.S в Windows sudo не нужно  
 ```
 sudo su root дает возможность избежать слово sudo,но под рутом сидеть опасно 
+- создаем новый ВМ с ubuntu 20.04 (НЕ 22.04!!!!)
+
+- заходим на сервер
+
+nemets87
+ssh nemets87@158.160.21.17
+
+- ставим докер и композ
+sudo apt update
+sudo apt install docker.io
+sudo apt install docker-compose
+sudo systemctl start docker
+
+- зайти в свой проект на компе, проверить докерфайл
 ```
 Собрать проект (в папке с файлом docker-compose.yaml:)
+зайти в свой проект на компе, проверить докерфайл
 ```
-sudo docker-compose up -d --build
+FROM python:3.7-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip3 install -r requirements.txt --no-cache-dir
+COPY . .
+CMD ["gunicorn", "api_yamdb.wsgi:application", "--bind", "0:8000"]
 ```
 
 Cделать миграции, создать суперпользователя и собрать статику 
@@ -69,9 +94,79 @@ sudo docker-compose exec web python manage.py migrate
 sudo docker-compose exec web python manage.py createsuperuser 
 sudo docker-compose exec web python manage.py collectstatic --no-input 
 ```
-Создаем дамп базы данных (нет их сейчас,но будут):
+- проверить воркфлоу, потом скопировать в корень проекта
 ```
-sudo docker-compose exec web python manage.py dumpdata > dumpPostrgeSQL.json
+name: workflow yamdb_final
+
+on: [push]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.7
+
+    - name: Install dependencies
+      run: | 
+        python -m pip install --upgrade pip 
+        pip install flake8 pep8-naming flake8-broken-line flake8-return flake8-isort
+        pip install -r api_yamdb/requirements.txt 
+        
+    - name: Test with flake8 and django tests
+      run: |
+        python -m flake8
+        pytest
+        
+  build_and_push_to_docker_hub:
+      name: Push Docker image to Docker Hub
+      runs-on: ubuntu-latest
+      needs: tests
+      if: github.ref == 'refs/heads/master'
+      steps:
+        - name: Check out the repo
+          uses: actions/checkout@v2
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@v1
+        - name: Login to Docker
+          uses: docker/login-action@v1
+          with:
+            username: ${{ secrets.DOCKER_USERNAME }}
+            password: ${{ secrets.DOCKER_PASSWORD }}
+        - name: Push to Docker Hub
+          uses: docker/build-push-action@v2
+          with:
+            context: ./api_yamdb/
+            push: true
+            tags: nemets87/api_yamdb:v1
+
+  deploy:
+      runs-on: ubuntu-latest
+      needs: build_and_push_to_docker_hub
+      if: github.ref == 'refs/heads/master'
+      steps:
+      - name: executing remote ssh commands to deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+          script: |
+            sudo docker-compose stop
+            sudo docker-compose rm web
+            touch .env
+            echo DB_ENGINE=${{ secrets.DB_ENGINE }} >> .env
+            echo DB_NAME=${{ secrets.DB_NAME }} >> .env
+            echo POSTGRES_USER=${{ secrets.POSTGRES_USER }} >> .env
+            echo POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} >> .env
+            echo DB_HOST=${{ secrets.DB_HOST }} >> .env
+            echo DB_PORT=${{ secrets.DB_PORT }} >> .env
+            sudo docker-compose up -d 
 ```
 докер хаб образ
 
@@ -82,35 +177,45 @@ https://hub.docker.com/repository/docker/nemets87/api_yamdb/general
 проект доступен по адресу 
 
 ```
-http://localhost/api/v1/
+http://158.160.21.17/admin/
+
+http://158.160.21.17/redoc/
 
 ```
-# Регистрация нового пользователя
+- скопируйте файлы docker-compose.yaml и nginx/default.conf на сервер
 ```
-POST http://localhost/api/v1/auth/signup/
-
-{
-  "email": "string",
-  "username": "string"
-}
+P- выполнить команды на сервере
+sudo docker-compose exec web python manage.py migrate 
+(возможно понадобиться сделать makemigrations reviews)
+sudo docker-compose exec web python manage.py createsuperuser
+sudo docker-compose exec web python manage.py collectstatic --no-input 
+sudo docker-compose exec web python manage.py migrate 
 ```
 
-**Редактирование, удаление и создание категорий жанров и произведений доступно только Администратору**
+**Р- проверили сайт по полной, что админка и ридок нормально работает**
 # Примеры запросов
 ## Получение списка всех категорий
 
 ```
-GET http://localhost/api/v1/categories/
+логинемся
 ```
-## Добавление новой категории
+## ВМ не крутим целый год == на диплом ее == на диплом 
 
 ```
-POST http://localhost/api/v1/categories/
+- если все хорошо, то легкая проверка сайта, что действительно запустилось.
+Если не запускается IP/redoc, то скорей всего этот файл не попал на сервер.
+Можно добавить его туда вручную:
+1. Локально: 
+scp redoc.yaml  <имя_на_сервере>@<публичный_IP>:~
+(закинуть на сервер)
+2. На сервере:
+sudo docker cp redoc.yaml <id_container>:/app/static
 
-{
-  "name": "string",
-  "slug": "string"
-}
+Если локально не удается скопировать файл на сервер, можно его создать прямо на сервере:
+1. sudo nano redoc.yaml
+ - скопировать в него данные из локального redoc.yaml
+2. Перенести файл в нужную папку:
+sudo docker cp redoc.yaml <id_container>:/app/static
 ```
 
 
