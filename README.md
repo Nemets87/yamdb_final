@@ -164,6 +164,7 @@ jobs:
           script: |
             sudo docker-compose stop
             sudo docker-compose rm web
+            rm .env
             touch .env
             echo DB_ENGINE=${{ secrets.DB_ENGINE }} >> .env
             echo DB_NAME=${{ secrets.DB_NAME }} >> .env
@@ -179,7 +180,7 @@ jobs:
 https://hub.docker.com/repository/docker/nemets87/api_yamdb/general
 ```
 
-проект доступен по адресу 
+проект доступен по адресу (при включенной вм)
 
 ```
 http://158.160.21.17/admin/
